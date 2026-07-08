@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.42.1](https://github.com/githubnext/ado-aw/compare/v0.42.0...v0.42.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **engine:** allow hyphenated GitHub App private key variables ([#1417](https://github.com/githubnext/ado-aw/issues/1417)) ([ad027f5](https://github.com/githubnext/ado-aw/commit/ad027f526a353a4df2fdce883bd017770cbba69b))
+* **executor-e2e:** let definition variable override issue-filing repo ([#1403](https://github.com/githubnext/ado-aw/issues/1403)) ([3f6ac09](https://github.com/githubnext/ado-aw/commit/3f6ac0911c1556a6fb2d2df90aa85bf8d437bde9))
+* **executor-e2e:** self-diagnose GitHub issue-filing auth failures ([#1401](https://github.com/githubnext/ado-aw/issues/1401)) ([6967da7](https://github.com/githubnext/ado-aw/commit/6967da788851bfb85b7ebe4dd2d01387eb353387))
+* **safe-outputs:** send empty body for add-build-tag PUT ([#1423](https://github.com/githubnext/ado-aw/issues/1423)) ([fa89e22](https://github.com/githubnext/ado-aw/commit/fa89e2233ec87b1b7afed63812a3d1f97ecd2d3d))
+
 ## [0.42.0](https://github.com/githubnext/ado-aw/compare/v0.41.0...v0.42.0) (2026-07-07)
 
 
