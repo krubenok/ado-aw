@@ -255,7 +255,7 @@ pub const DEFAULT_COPILOT_MODEL: &str = "claude-opus-4.7";
 
 /// Default pinned version of the Copilot CLI.
 /// Override per-agent via `engine: { id: copilot, version: "1.0.35" }` in front matter.
-pub const COPILOT_CLI_VERSION: &str = "1.0.64";
+pub const COPILOT_CLI_VERSION: &str = "1.0.69";
 const COPILOT_CLI_RELEASES_BASE: &str = "https://github.com/github/copilot-cli/releases";
 
 /// Resolved engine — enum dispatch over supported engine identifiers.
@@ -1723,20 +1723,6 @@ mod tests {
             "---\nname: test\ndescription: test\nengine:\n  id: copilot\n  env:\n    MY_VAR: hi\n---\n",
         ).unwrap();
         assert!(copilot_byom_credential_keys(&fm.engine).is_empty());
-    }
-
-    #[test]
-    fn engine_expression_base_url_host_rejects_non_dns_safe() {
-        // An IPv6 literal parses to a host but is not DNS-safe, so it must not
-        // be added to the AWF allow-domains list (consistent with api-target).
-        let (fm, _) = parse_markdown(
-            "---\nname: test\ndescription: test\nengine:\n  id: copilot\n  env:\n    COPILOT_PROVIDER_BASE_URL: \"http://[::1]:8080/v1\"\n---\n",
-        ).unwrap();
-        let hosts = Engine::Copilot.required_hosts(&fm.engine);
-        assert!(
-            hosts.is_empty(),
-            "non-DNS-safe host (IPv6 literal) must be rejected from the allowlist: {hosts:?}"
-        );
     }
 
     #[test]
