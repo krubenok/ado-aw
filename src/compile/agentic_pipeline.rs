@@ -2621,9 +2621,11 @@ fn start_mcpg_step(
          #   - Rewrite URLs from 127.0.0.1 to host.docker.internal (AWF container needs\n\
          #     host.docker.internal to reach MCPG on the host; 127.0.0.1 is container loopback)\n\
          #   - Ensure tools: [\"*\"] on each server entry (Copilot CLI requirement)\n\
+         #   - Mark ado-aw managed gateway servers as default so Copilot's third-party\n\
+         #     MCP policy does not block the workflow's own internal safe-output tools\n\
          #   - Preserve all other fields (headers, type, etc.)\n\
          jq --arg prefix \"http://$(MCP_GATEWAY_DOMAIN):$(MCP_GATEWAY_PORT)\" \\\n  \
-           '.mcpServers |= (to_entries | sort_by(.key) | map(.value.url |= sub(\"^http://[^/]+/\"; \"\\($prefix)/\") | .value.tools = [\"*\"]) | from_entries)' \\\n  \
+           '.mcpServers |= (to_entries | sort_by(.key) | map(.value.url |= sub(\"^http://[^/]+/\"; \"\\($prefix)/\") | .value.tools = [\"*\"] | .value.isDefaultServer = true) | from_entries)' \\\n  \
            \"$GATEWAY_OUTPUT\" > /tmp/awf-tools/mcp-config.json\n\
          \n\
          chmod 600 /tmp/awf-tools/mcp-config.json\n\
@@ -3550,6 +3552,18 @@ mod tests {
                 other => panic!("part {} expected Custom, got {other:?}", i + 1),
             }
         }
+    }
+
+    #[test]
+    fn start_mcpg_step_marks_gateway_servers_as_default_for_copilot() {
+        let bash_step = start_mcpg_step("", "", false, None).expect("MCPG step builds");
+
+        assert!(
+            bash_step
+                .script
+                .contains(".value.isDefaultServer = true"),
+            "Copilot blocks non-default additional MCP servers by policy; ado-aw managed gateway servers must be marked as default in the generated config"
+        );
     }
 
     // ── parse_env_block ────────────────────────────────────────────────────
