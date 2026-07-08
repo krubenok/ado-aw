@@ -2717,6 +2717,28 @@ mod tests {
         CompileContext::for_test(fm).engine.args(fm, &declarations)
     }
 
+    fn assert_default_mcp_allow_tools(params: &str) {
+        assert!(
+            params.contains("--allow-tool=github"),
+            "built-in GitHub MCP should be explicitly allow-listed: {params}"
+        );
+        assert!(
+            params.contains("--allow-tool=safeoutputs"),
+            "SafeOutputs MCP should be explicitly allow-listed: {params}"
+        );
+    }
+
+    fn assert_no_bash_or_write_allow_tools(params: &str) {
+        assert!(
+            !params.contains("--allow-tool=\"shell("),
+            "unrestricted bash should not emit individual shell allow-tools: {params}"
+        );
+        assert!(
+            !params.contains("--allow-tool=write"),
+            "unrestricted edit access should not emit individual write allow-tool: {params}"
+        );
+    }
+
     // ─── generate_agent_job_variables ─────────────────────────────────
 
     // ─── normalize_yaml ───────────────────────────────────────────────────────
@@ -3277,10 +3299,8 @@ mod tests {
             params.contains("--allow-all-tools"),
             "wildcard bash should emit --allow-all-tools"
         );
-        assert!(
-            !params.contains("--allow-tool"),
-            "no individual --allow-tool flags with --allow-all-tools"
-        );
+        assert_default_mcp_allow_tools(&params);
+        assert_no_bash_or_write_allow_tools(&params);
     }
 
     #[test]
@@ -3297,10 +3317,8 @@ mod tests {
             params.contains("--allow-all-tools"),
             "\"*\" should behave same as \":*\""
         );
-        assert!(
-            !params.contains("--allow-tool"),
-            "no individual --allow-tool flags with --allow-all-tools"
-        );
+        assert_default_mcp_allow_tools(&params);
+        assert_no_bash_or_write_allow_tools(&params);
     }
 
     #[test]
@@ -3343,10 +3361,8 @@ mod tests {
             params.contains("--allow-all-tools"),
             "default (no bash) should emit --allow-all-tools"
         );
-        assert!(
-            !params.contains("--allow-tool"),
-            "no individual --allow-tool flags with --allow-all-tools"
-        );
+        assert_default_mcp_allow_tools(&params);
+        assert_no_bash_or_write_allow_tools(&params);
     }
 
     #[test]
@@ -3364,7 +3380,7 @@ mod tests {
             "edit disabled should NOT emit --allow-all-paths"
         );
         assert!(
-            !params.contains("--allow-tool write"),
+            !params.contains("--allow-tool=write"),
             "edit disabled should NOT emit --allow-tool write"
         );
     }
@@ -3387,10 +3403,8 @@ mod tests {
             params.contains("--allow-all-paths"),
             "edit enabled should still emit --allow-all-paths"
         );
-        assert!(
-            !params.contains("--allow-tool"),
-            "no individual --allow-tool flags"
-        );
+        assert_default_mcp_allow_tools(&params);
+        assert_no_bash_or_write_allow_tools(&params);
     }
 
     #[test]
@@ -3448,15 +3462,17 @@ mod tests {
             params.contains("--allow-all-tools"),
             "wildcard should use --allow-all-tools"
         );
-        // Should NOT add individual tool flags when --allow-all-tools is active
+        assert_default_mcp_allow_tools(&params);
         assert!(
-            !params.contains("--allow-tool"),
-            "no individual tool flags with --allow-all-tools"
+            !params.contains("shell(lean)")
+                && !params.contains("shell(lake)")
+                && !params.contains("shell(elan)"),
+            "runtime bash commands are covered by --allow-all-tools: {params}"
         );
     }
 
     #[test]
-    fn test_engine_args_custom_mcp_no_mcp_flag() {
+    fn test_engine_args_custom_mcp_allow_listed_with_all_tools() {
         let mut fm = minimal_front_matter();
         fm.mcp_servers.insert(
             "my-tool".to_string(),
@@ -3467,8 +3483,8 @@ mod tests {
         );
         let params = engine_args_for(&fm).unwrap();
         assert!(
-            !params.contains("--allow-tool my-tool"),
-            "default (all-tools) mode should not emit individual --allow-tool for MCPs"
+            params.contains("--allow-tool=my-tool"),
+            "MCP servers should be explicitly allow-listed even with --allow-all-tools: {params}"
         );
     }
 
@@ -3490,7 +3506,7 @@ mod tests {
         );
         let params = engine_args_for(&fm).unwrap();
         assert!(
-            params.contains("--allow-tool my-tool"),
+            params.contains("--allow-tool=my-tool"),
             "container MCP should get --allow-tool"
         );
     }
@@ -3513,7 +3529,7 @@ mod tests {
         );
         let params = engine_args_for(&fm).unwrap();
         assert!(
-            params.contains("--allow-tool remote-ado"),
+            params.contains("--allow-tool=remote-ado"),
             "URL MCP should get --allow-tool"
         );
     }
@@ -3525,7 +3541,7 @@ mod tests {
             .insert("my-tool".to_string(), McpConfig::Enabled(true));
         let params = engine_args_for(&fm).unwrap();
         assert!(
-            !params.contains("--allow-tool my-tool"),
+            !params.contains("--allow-tool=my-tool"),
             "Enabled(true) with no container/url should not get --allow-tool"
         );
     }
@@ -3555,10 +3571,10 @@ mod tests {
         );
         let params = engine_args_for(&fm).unwrap();
         let a_pos = params
-            .find("--allow-tool a-tool")
+            .find("--allow-tool=a-tool")
             .expect("a-tool should be present");
         let z_pos = params
-            .find("--allow-tool z-tool")
+            .find("--allow-tool=z-tool")
             .expect("z-tool should be present");
         assert!(
             a_pos < z_pos,

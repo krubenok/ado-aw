@@ -5,7 +5,7 @@ use super::{CompileContext, CompilerExtension, Declarations, ExtensionPhase};
 /// GitHub MCP extension.
 ///
 /// Always-on internal extension that grants the agent access to the
-/// Copilot CLI built-in GitHub MCP server via `--allow-tool github`.
+/// Copilot CLI built-in GitHub MCP server via `--allow-tool=github`.
 /// The GitHub MCP uses `GITHUB_TOKEN` from the pipeline environment.
 pub struct GitHubExtension;
 
@@ -19,7 +19,7 @@ impl CompilerExtension for GitHubExtension {
     }
 
     /// Typed-IR view. The GitHub extension only contributes a single
-    /// `--allow-tool github` flag — no steps, hosts, or env vars —
+    /// `--allow-tool=github` flag — no steps, hosts, or env vars —
     /// routed through the `Declarations` bundle.
     fn declarations(&self, _ctx: &CompileContext) -> anyhow::Result<Declarations> {
         Ok(Declarations {

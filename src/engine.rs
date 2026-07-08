@@ -439,15 +439,9 @@ impl Engine {
     }
 }
 
-/// Collects the list of allowed tool identifiers when bash is not in wildcard mode.
-///
-/// Returns a flat `Vec<String>` of fully-qualified tool identifiers ready to be
-/// passed as `--allow-tool` arguments. Only called when `use_allow_all_tools` is
-/// `false`; the caller upholds that invariant.
-fn collect_allowed_tools(
+fn collect_allowed_mcp_servers(
     front_matter: &FrontMatter,
     extension_declarations: &[Declarations],
-    edit_enabled: bool,
 ) -> Result<Vec<String>> {
     let mut allowed_tools: Vec<String> = Vec::new();
 
@@ -483,6 +477,21 @@ fn collect_allowed_tools(
             allowed_tools.push(name.clone());
         }
     }
+
+    Ok(allowed_tools)
+}
+
+/// Collects the list of allowed tool identifiers when bash is not in wildcard mode.
+///
+/// Returns a flat `Vec<String>` of fully-qualified tool identifiers ready to be
+/// passed as `--allow-tool` arguments. Only called when `use_allow_all_tools` is
+/// `false`; the caller upholds that invariant.
+fn collect_allowed_tools(
+    front_matter: &FrontMatter,
+    extension_declarations: &[Declarations],
+    edit_enabled: bool,
+) -> Result<Vec<String>> {
+    let mut allowed_tools = collect_allowed_mcp_servers(front_matter, extension_declarations)?;
 
     // Intentional: with restricted bash, both --allow-tool write (tool identity)
     // and --allow-all-paths (path scope) are emitted. --allow-all-tools subsumes
@@ -534,6 +543,16 @@ fn collect_allowed_tools(
     }
 
     Ok(allowed_tools)
+}
+
+fn format_allow_tool_arg(tool: &str) -> String {
+    if tool.contains('(') || tool.contains(')') || tool.contains(' ') {
+        // Use double quotes - the copilot_params are embedded inside a single-quoted
+        // bash string in the AWF command, so single quotes would break quoting.
+        format!("--allow-tool=\"{}\"", tool)
+    } else {
+        format!("--allow-tool={}", tool)
+    }
 }
 
 /// Validates a single `engine.args` entry.
@@ -588,10 +607,10 @@ fn copilot_args(
         .and_then(|t| t.edit)
         .unwrap_or(true);
 
-    // When --allow-all-tools is active, skip individual tool collection entirely.
-    // --allow-all-tools is a superset that permits all tool calls regardless.
     let allowed_tools: Vec<String> = if use_allow_all_tools {
-        Vec::new()
+        // --allow-all-tools permits tool calls without prompting, but Copilot still
+        // requires additional MCP servers to be explicitly allow-listed.
+        collect_allowed_mcp_servers(front_matter, extension_declarations)?
     } else {
         collect_allowed_tools(front_matter, extension_declarations, edit_enabled)?
     };
@@ -651,16 +670,10 @@ fn copilot_args(
 
     if use_allow_all_tools {
         params.push("--allow-all-tools".to_string());
-    } else {
-        for tool in allowed_tools {
-            if tool.contains('(') || tool.contains(')') || tool.contains(' ') {
-                // Use double quotes - the copilot_params are embedded inside a single-quoted
-                // bash string in the AWF command, so single quotes would break quoting.
-                params.push(format!("--allow-tool \"{}\"", tool));
-            } else {
-                params.push(format!("--allow-tool {}", tool));
-            }
-        }
+    }
+
+    for tool in allowed_tools {
+        params.push(format_allow_tool_arg(&tool));
     }
 
     // --allow-all-paths when edit is enabled — lets the agent write to any file path.
@@ -1203,6 +1216,54 @@ mod tests {
         // Default engine (copilot) uses default model (claude-opus-4.7)
         assert!(params.contains("--model claude-opus-4.7"));
         assert!(params.contains("--disable-builtin-mcps"));
+    }
+
+    #[test]
+    fn copilot_engine_allow_tool_uses_equals_form() {
+        let (front_matter, _) = parse_markdown(
+            "---\nname: test\ndescription: test\ntools:\n  edit: false\n  bash:\n    - cat\nsafe-outputs:\n  add-pr-comment: {}\n---\n",
+        )
+        .unwrap();
+        let params = Engine::Copilot
+            .args(&front_matter, &declarations_for(&front_matter))
+            .unwrap();
+
+        assert!(
+            params.contains("--allow-tool=safeoutputs"),
+            "MCP server allow-list entries must use the equals form: {params}"
+        );
+        assert!(
+            params.contains("--allow-tool=\"shell(cat)\""),
+            "shell allow-list entries must be quoted after '=' so bash does not parse parentheses: {params}"
+        );
+        assert!(
+            !params.contains("--allow-tool safeoutputs"),
+            "space-separated optional values are parsed incorrectly by Copilot CLI: {params}"
+        );
+    }
+
+    #[test]
+    fn copilot_engine_allow_all_tools_still_allows_safeoutputs_mcp() {
+        let (front_matter, _) = parse_markdown(
+            "---\nname: test\ndescription: test\nsafe-outputs:\n  add-pr-comment: {}\n---\n",
+        )
+        .unwrap();
+        let params = Engine::Copilot
+            .args(&front_matter, &declarations_for(&front_matter))
+            .unwrap();
+
+        assert!(
+            params.contains("--allow-all-tools"),
+            "default bash mode should use the all-tools fast path: {params}"
+        );
+        assert!(
+            params.contains("--allow-tool=safeoutputs"),
+            "additional MCP servers still need explicit allow-listing with --allow-all-tools: {params}"
+        );
+        assert!(
+            !params.contains("--allow-tool safeoutputs"),
+            "space-separated optional values are parsed incorrectly by Copilot CLI: {params}"
+        );
     }
 
     #[test]

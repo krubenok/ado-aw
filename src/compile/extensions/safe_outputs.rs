@@ -21,7 +21,7 @@ impl CompilerExtension for SafeOutputsExtension {
 
     /// Typed-IR view. SafeOutputs contributes only static
     /// signals — an MCPG HTTP backend, a prompt supplement, and a
-    /// single `--allow-tool safeoutputs` flag.
+    /// single `--allow-tool=safeoutputs` flag.
     fn declarations(&self, _ctx: &CompileContext) -> Result<Declarations> {
         Ok(Declarations {
             mcpg_servers: vec![(
