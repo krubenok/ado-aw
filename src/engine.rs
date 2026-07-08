@@ -555,6 +555,17 @@ fn format_allow_tool_arg(tool: &str) -> String {
     }
 }
 
+fn format_user_arg(arg: &str) -> String {
+    if arg.contains('(') || arg.contains(')') || arg.contains('*') {
+        // Parentheses are shell syntax and asterisks can glob. `validate_user_arg`
+        // rejects double quotes, dollars, backticks, and other expansion characters,
+        // so double-quoting is sufficient here.
+        format!("\"{}\"", arg)
+    } else {
+        arg.to_string()
+    }
+}
+
 /// Validates a single `engine.args` entry.
 ///
 /// Returns an error if the argument contains unsafe characters or attempts to
@@ -687,7 +698,7 @@ fn copilot_args(
     // non-security defaults via last-wins semantics (e.g., --model).
     for arg in front_matter.engine.args() {
         validate_user_arg(arg)?;
-        params.push(arg.to_string());
+        params.push(format_user_arg(arg));
     }
 
     Ok(params.join(" "))
@@ -1539,6 +1550,18 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .contains("invalid characters")
+        );
+    }
+
+    #[test]
+    fn engine_args_quotes_tool_filter_patterns() {
+        let (fm, _) = parse_markdown(
+            "---\nname: test\ndescription: test\nengine:\n  id: copilot\n  args:\n    - --excluded-tools=skill(review-ado-changes)\n---\n",
+        ).unwrap();
+        let params = Engine::Copilot.args(&fm, &declarations_for(&fm)).unwrap();
+        assert!(
+            params.contains("\"--excluded-tools=skill(review-ado-changes)\""),
+            "parenthesized tool filters must be shell-quoted: {params}"
         );
     }
 

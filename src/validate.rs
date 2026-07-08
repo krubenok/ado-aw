@@ -143,10 +143,16 @@ pub fn is_valid_service_connection(s: &str) -> bool {
 
 /// Characters allowed in individual engine.args entries.
 /// Strict allowlist to prevent shell injection inside AWF single-quoted commands.
+/// Parentheses, commas, and asterisks are needed for Copilot tool filter patterns
+/// such as `--excluded-tools=skill(name)` and `--available-tools=shell(git:*)`.
 pub fn is_valid_arg(s: &str) -> bool {
     !s.is_empty()
         && s.chars().all(|c| {
-            c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | ':' | '-' | '=' | '/' | '@')
+            c.is_ascii_alphanumeric()
+                || matches!(
+                    c,
+                    '.' | '_' | ':' | '-' | '=' | '/' | '@' | '(' | ')' | ',' | '*'
+                )
         })
 }
 
@@ -911,6 +917,8 @@ mod tests {
         assert!(is_valid_arg("--option=value"));
         assert!(is_valid_arg("--path=/dir/file"));
         assert!(is_valid_arg("--email=user@domain"));
+        assert!(is_valid_arg("--excluded-tools=skill(review-ado-changes)"));
+        assert!(is_valid_arg("--available-tools=shell(git:*)"));
         assert!(!is_valid_arg(""));
         assert!(!is_valid_arg("--flag; rm -rf /"));
         assert!(!is_valid_arg("arg with spaces"));
